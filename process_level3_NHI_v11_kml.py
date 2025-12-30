@@ -6,8 +6,7 @@
 #
 #==-ROC/FRB PYTHON PROGRAM DEFINITION-==========================================
 #
-#/home/pmccrone/python/src/CSVMaker
-#
+#/home/pmccrone/python/src/runrpg
 #
 # NAME:
 # :::::::::::::::::::::::::::::::::::::::::::::::
@@ -39,6 +38,7 @@
 #========================================================================================
 #  Version 1.0   , Dated 2025-June-04
 #                  Initial Build.
+#  Version 1.1   , Dated 2025-Dec-29    Fixed UNKNOWN problem in POSH/POH
 #========================================================================================
 #  NOTE: THIS PROGRAM ASSUMES THE USE OF Python version 3.8.8+ for RHEL.
 #---------------------------------------------------------------
@@ -90,8 +90,7 @@ except:# pylint: disable=bare-except
 #######################################################
 
 #CURRENT_WORKING_DIRECTORY='/home/pmccrone/python/src/runrpg'
-#$CURRENT_WORKING_DIRECTORY='/home/pmccrone/test'
-CURRENT_WORKING_DIRECTORY='/home/pmccrone/python/src/CSVMaker'
+CURRENT_WORKING_DIRECTORY='/home/pmccrone/test'
 #
 CWD_PATH=CURRENT_WORKING_DIRECTORY+'/'
 #
@@ -1687,6 +1686,9 @@ for newitem in start:
     # Another possible set of info.
     #0002472   POSH/POH        60/100   50/100   40/100   30/100   20/100   20/100           
     #
+    # Note must handle This possibility:
+    # 0004626   POSH/POH       UNKNOWN  UNKNOWN                                               
+    # If UNKNOWN, we will enter value 999.
 
     tvsthreelist=[]
     end_index=parnlist[bigi]
@@ -1696,6 +1698,22 @@ for newitem in start:
     print("Here is the the POSH POH line we are processing:")
     print(end0)
     printds()
+
+    #This section on UNKNOWN detection was added in V1.1   
+
+    UNK='UNKNOWN'
+    UNK0=0
+    NUMUNK=0
+
+    if UNK in end0:
+        printwarn()
+        print("UNKNOWN WAS DETECTED. We will enter -999- for POSH-POH.")
+        printwarn()   
+        NUMUNK=end0.count(UNK)
+        printds()
+        print('There are '+str(NUMUNK)+' UNKNOWS in this line')
+        printds()
+        UNK0=999
 
     tvsthreelist=end0.split()
 
@@ -1707,6 +1725,7 @@ for newitem in start:
     numberslashes=end0.count("/")
     lenend0=len(end0)
     lenend=lenend0-1
+    NUMPPSLASH=numberslashes-1
 
     i=2
     ppposition=[]
@@ -1744,55 +1763,180 @@ for newitem in start:
             slshindex=slshindex+1             # increment to the next string.
 
 
-    #If there are no POSH/POH lines, there are no Hail detections, so we end the program.
+    # If there are no POSH/POH lines, there are no Hail detections, so we end the program.
+    # This is unchanged for V1.1, since even with UNKNOWN values, 
+    # there should be at least one slash for POSH/POH
     #
     if not slshinlist:
-        printwarn()
-        print("There were no POSH POH slashes detected!")
+        printerr()
+        print("There were no POSH POH slashes detected! This should not occur. Inspect this file.")
         print("The program will end.")
-        printwarn()
-        exit() ## The program ends.
+        printerr()
+        sys.exit() ## The program ends.
 
     # We need to make sure there are at least two slashes in this string! The slash in POSH/POH does not help.
+    # However, in V1.1, we must account for the number of UNKNOWNS.
 
-    numsllist=len(slshinlist)
-    if numsllist < 2:
-        printwarn()
-        print("There were not enough POSH POH slashes detected! (We need two.)")
-        print("The program will end.")
-        printwarn()
-        exit() ## The program ends.
-
-    # Logic says that there were at least two slashes in this line.
-    # The first is the POSH/POH. The second one should have actual data. Any other slashes that follow should also have data. 
-    # I now know where the slashes are! I will begin looking at index number 1 not 0. 0 is the POSH/POH slash, which I ignore.
-    poshchar=""
-    poh_char=""
-    posit=0      # posit is the location of the slash in the end0 string.
-    poshlist=[]
-    poh_list=[]  #  I did on purpose put the underscore char in poh_list and poh_char to not get confused with posh.
-    sllistindex=0
-    for item in slshinlist:
-        if sllistindex > 0:                      # This is how I ignore the first POSH/POH. The index must be > 0
-            #
-            posit=int(item)
-            poshchar=end0[posit-3:posit]     # this is the characters before the slash, the posh 
-            poh_char=end0[posit+1:posit+4]   # these are the char after the slash, the poh.
-            #
-            try: 
-                poshlist.append(int(poshchar))       # Append the int value of the POSH in the list poshlist 
-                poh_list.append(int(poh_char))       # Append the int value of the POH  in the list poh_list.
-            except:  # pylint: disable=bare-except
-                poshlist.append(0)
-                poh_list.append(0)
-                printwarn()
-                print("WARNING: There was a problem converting POSH/POH to integer. Zeroes were added.")
-                printwarn()
+    if UNK0 ==0:
         #
-        sllistindex=sllistindex+1
+        printok()
+        print("UNNOWNS was ZERO, continue with regular approach.")    
+        #
+        numsllist=len(slshinlist)
+        if numsllist < 2:
+            printwarn()
+            print("There were not enough POSH POH slashes detected! (We need two.)")
+            print("The program will end.")
+            printwarn()
+            exit() ## The program ends.
+
+        # Logic says that there were at least two slashes in this line.
+        # The first is the POSH/POH. The second one should have actual data. Any other slashes that follow should also have data. 
+        # I now know where the slashes are! I will begin looking at index number 1 not 0. 0 is the POSH/POH slash, which I ignore.
+        poshchar=""
+        poh_char=""
+        posit=0      # posit is the location of the slash in the end0 string.
+        poshlist=[]
+        poh_list=[]  #  I did on purpose put the underscore char in poh_list and poh_char to not get confused with posh.
+        sllistindex=0
+        for item in slshinlist:
+            if sllistindex > 0:                      # This is how I ignore the first POSH/POH. The index must be > 0
+                #
+                posit=int(item)
+                poshchar=end0[posit-3:posit]     # this is the characters before the slash, the posh 
+                poh_char=end0[posit+1:posit+4]   # these are the char after the slash, the poh.
+                #
+                try: 
+                    poshlist.append(int(poshchar))       # Append the int value of the POSH in the list poshlist 
+                    poh_list.append(int(poh_char))       # Append the int value of the POH  in the list poh_list.
+                except:  # pylint: disable=bare-except
+                    poshlist.append(0)
+                    poh_list.append(0)
+                    printwarn()
+                    print("WARNING: There was a problem converting POSH/POH to integer. Zeroes were added.")
+                    printwarn()
+            #
+            sllistindex=sllistindex+1
  
-    # End of slshlistin loop
+        # End of slshlistin loop
     
+    # This decoding section was added in V1.1
+    # This handles the unknown issue. I previously detected the prescence on UNKNOWN in the POSH-POH line
+    if UNK0 ==999:
+        printds()
+        print("UNKNOWNS were discovered. We counted the number previously. We will use 999 to show UNKNOWN.")
+        poshchar="999"
+        poh_char="999"
+        posit=0      # posit is the location of the slash in the end0 string.
+        poshlist=[]
+        poh_list=[]  #  I did on purpose put the underscore char in poh_list and poh_char to
+        #
+        for item in tvsthreelist:
+            #
+            if UNK in item or item == UNK :
+                try:
+                    poshlist.append(int(poshchar))
+                    poh_list.append(int(poh_char))
+                    print("999 was appended to the poshlist and poh_list")
+                except:
+                    poshlist.append(0)
+                    poh_list.append(0)
+                    printwarn()
+                    print("WARNING: There was a problem converting POSH/POH to integer. Zeroes were added.")
+                    printwarn()
+    #
+    # End of 999 section
+
+
+    # The UNK0=888 section will handle the scenario where 
+    # there are a mixed case of some real data in POSH/POH and one or more UNKNOWNs.
+ 
+
+    if UNK0 ==888:
+        STRZERO="ZERO" 
+        STRING888=""  # I will use this variable to piece together the POSH POH line
+        printds()
+        print("Some POSH-POH and UNKNOWNS were discovered. We will use 999 to show UNKNOWN.")
+        printds()
+        poshchar="0"
+        poh_char="0"
+        posit=0      # posit is the location of the slash in the end0 string.
+        poshlist=[]
+        poh_list=[]  #  I did on purpose put the underscore char in poh_list and poh_char to
+        #
+        NUMITEMSINLINE=NUMPPSLASH+NUMUNK
+        printds()
+        print("There are "+str(NUMITEMSINLINE)+" to decode.")
+        if NUMPPSLASH > 5:
+            printerr()
+            print("These was a serious error miscounting POSH-POH and Unknown in section 888. Program stops")
+            printerr()
+            sys.exit()
+        #
+        # We will simply assume that any numbers mixed in with UNKNOWN are very small and we will use zero.
+        #
+        if NUMPPSLASH ==1:
+            STRING888="ZERO "
+        if NUMPPSLASH ==2:
+            STRING888="ZERO ZERO "
+        if NUMPPSLASH ==3:
+            STRING888="ZERO ZERO ZERO "
+        if NUMPPSLASH ==4:
+            STRING888="ZERO ZERO ZERO ZERO "
+        if NUMPPSLASH ==5:
+            STRING888="ZERO ZERO ZERO ZERO ZERO "
+
+        if NUMUNK ==1:
+            STRING888.append(UNK)
+        if NUMUNK ==2:
+            STRING888.append(UNK+" "+UNK)
+        if NUMUNK ==3:
+            STRING888.append(UNK+" "+UNK+" "+UNK)
+        if NUMUNK ==4:
+            STRING888.append(UNK+" "+UNK+" "+UNK+" "+UNK)
+        if NUMUNK ==5:
+            STRING888.append(UNK+" "+UNK+" "+UNK+" "+UNK+" "+UNK)
+
+        #
+        poshchar="999"
+        poh_char="999"
+        for item in STRING888:
+            #
+            if UNK in item or item == UNK:
+                try:
+                    poshlist.append(int(poshchar))
+                    poh_list.append(int(poh_char))
+                    print("999 was appended to the poshlist and poh_list")
+                except:
+                    poshlist.append(0)
+                    poh_list.append(0)
+                    printwarn()
+                    print("WARNING: There was a problem converting POSH/POH to integer. Zeroes were added.")
+                    printwarn()
+            if STRZERO in item or item == STRZERO:
+                try:
+                    poshlist.append(int(0))
+                    poh_list.append(int(0))
+                    print("999 was appended to the poshlist and poh_list")
+                except:
+                    poshlist.append(0)
+                    poh_list.append(0)
+                    printwarn()
+                    print("WARNING: There was a problem converting POSH/POH to integer. Zeroes were added.")
+                    printwarn()
+
+    #
+    # End of 88 section
+
+    # This is an error check. This should not happen. 
+    #UNK0 must be 0, 888 or 999. if it is somehow not 0 or 999 something has happened. Stop the program and fix it.
+
+    if UNK0 !=0 and UNK0 !=888 and UNK0 != 999:
+        printerr()
+        print("There was a serious problem with the UNKNOWN issue, check this file! PROGRAM WILL STOP.")   
+        printerr()
+        sys.exit() # We should never see this happen.
+
     i=0
     for item in storm_index:
         posh.append(poshlist[i])
